@@ -415,20 +415,24 @@ bool UPositionStore::HitByPrediction(const FVector& StartPos, const FVector& Dir
 	{
 		WorldTransform = U2PTransform(PredictShapeData.ShapeTransforms[i]);
 		ShapeHandle = &PredictShapeData.Shapes[i];
-		Geometry = &(ShapeHandle->Shape->getGeometry().any());
-
-		NumHits = PxGeometryQuery::raycast(U2PVector(StartPos), U2PVector(Dir), *Geometry,
-		                                   WorldTransform, MaxDist, PHitFlags, MaxHits,
-		                                   &PHits[0]);
-		if (NumHits > 0)
+		if (ShapeHandle)
 		{
-			FCollisionFilterData QueryFilter;
-			QueryFilter.Word2 = 0xFFFFF;
-			const FVector EndPos = StartPos + (Dir * MaxDist);
-			LagCompensationSystem::ConvertQueryImpactHit(GetWorld(), PHits[0], OutHit, MaxDist, QueryFilter, StartPos,
-			                                             EndPos, Geometry, FTransform(StartPos), false, false);
+			Geometry = &(ShapeHandle->Shape->getGeometry().any());
 
-			break;
+			NumHits = PxGeometryQuery::raycast(U2PVector(StartPos), U2PVector(Dir), *Geometry,
+			                                   WorldTransform, MaxDist, PHitFlags, MaxHits,
+			                                   &PHits[0]);
+			if (NumHits > 0)
+			{
+				FCollisionFilterData QueryFilter;
+				QueryFilter.Word2 = 0xFFFFF;
+				const FVector EndPos = StartPos + (Dir * MaxDist);
+				LagCompensationSystem::ConvertQueryImpactHit(GetWorld(), PHits[0], OutHit, MaxDist, QueryFilter,
+				                                             StartPos,
+				                                             EndPos, Geometry, FTransform(StartPos), false, false);
+
+				break;
+			}
 		}
 	}
 
