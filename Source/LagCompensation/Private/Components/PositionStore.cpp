@@ -379,7 +379,7 @@ FShapeData UPositionStore::GetPredictionShapeData(const float PredictionTime)
 				}
 			}
 		}
-		else if(StoredPositions.Num() > 0)
+		else if (StoredPositions.Num() > 0)
 		{
 			CurrentShapeData = StoredPositions[0].ShapeData;
 		}
@@ -394,32 +394,47 @@ bool UPositionStore::HitByPrediction(const FVector& StartPos, const FVector& Dir
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(TEXT("HitByPrediction"));
 
+	if (!IsValidBodyInstances())
+	{
+		return false;
+	}
+
 	if (StoredPositions.Num() <= 0)
 	{
 		return false;
 	}
 
+	UWorld* World = GetWorld();
+	FPhysScene* PhysScene = IsValid(World) ? World->GetPhysicsScene() : nullptr;
+	if(!PhysScene)
+	{
+		return false;
+	}
+
+
 	int32 NumHits = 0;
 	const PxU32 MaxHits = 1;
 	FHitRaycast PHits[MaxHits];
-	FPhysicsGeometry* Geometry = nullptr;
-	const FPhysicsShapeHandle* ShapeHandle = nullptr;
 	FPhysicsTransform WorldTransform;
 
 	const FShapeData PredictShapeData = GetPredictionShapeData(PredictionTimes);
 
-#if WITH_PHYSX
-	const PxHitFlags PHitFlags = PxHitFlag::eDEFAULT;
-
-	for (int32 i = 0; i < PredictShapeData.Shapes.Num(); ++i)
+	FPhysicsCommand::ExecuteRead(PhysScene, [&]()
 	{
-		WorldTransform = U2PTransform(PredictShapeData.ShapeTransforms[i]);
-		ShapeHandle = &PredictShapeData.Shapes[i];
-		if (ShapeHandle)
-		{
-			Geometry = &(ShapeHandle->Shape->getGeometry().any());
+#if WITH_PHYSX
+		const PxHitFlags PHitFlags = PxHitFlag::eDEFAULT;
 
-			NumHits = PxGeometryQuery::raycast(U2PVector(StartPos), U2PVector(Dir), *Geometry,
+		for (int32 i = 0; i < PredictShapeData.Shapes.Num(); ++i)
+		{
+			WorldTransform = U2PTransform(PredictShapeData.ShapeTransforms[i]);
+			const FPhysicsShapeHandle& ShapeHandle = PredictShapeData.Shapes[i];
+			if (!ShapeHandle.Shape)
+			{
+				continue;
+			}
+			const PxGeometry& Geometry = ShapeHandle.Shape->getGeometry().any();
+
+			NumHits = PxGeometryQuery::raycast(U2PVector(StartPos), U2PVector(Dir), Geometry,
 			                                   WorldTransform, MaxDist, PHitFlags, MaxHits,
 			                                   &PHits[0]);
 			if (NumHits > 0)
@@ -429,15 +444,13 @@ bool UPositionStore::HitByPrediction(const FVector& StartPos, const FVector& Dir
 				const FVector EndPos = StartPos + (Dir * MaxDist);
 				LagCompensationSystem::ConvertQueryImpactHit(GetWorld(), PHits[0], OutHit, MaxDist, QueryFilter,
 				                                             StartPos,
-				                                             EndPos, Geometry, FTransform(StartPos), false, false);
+				                                             EndPos, &Geometry, FTransform(StartPos), false, false);
 
 				break;
 			}
 		}
-	}
-
 #endif //WITH_PHYSX
-
+	});
 	return NumHits > 0;
 }
 

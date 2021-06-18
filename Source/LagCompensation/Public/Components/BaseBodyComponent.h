@@ -24,5 +24,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Initialize")
 	void Initialize(const TArray<UPrimitiveComponent*> PrimitiveComponents);
 
+	UFUNCTION(BlueprintCallable, Category="Utilities")
+	bool IsValidBodyInstances() const;
+
 	FORCEINLINE const LagCompensationTypes::FBodyInstances& GetBodyInstances() const;
 };

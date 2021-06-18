@@ -20,6 +20,19 @@ void UBaseBodyComponent::Initialize(const TArray<UPrimitiveComponent*> Primitive
 	}
 }
 
+bool UBaseBodyComponent::IsValidBodyInstances() const
+{
+	for (const auto* BodyInstance : BodyInstances)
+	{
+		if (!BodyInstance || !BodyInstance->IsValidBodyInstance())
+		{
+			return false;
+		}
+	}
+
+	return BodyInstances.Num() > 0;
+}
+
 FORCEINLINE const LagCompensationTypes::FBodyInstances& UBaseBodyComponent::GetBodyInstances() const
 {
 	return BodyInstances;
