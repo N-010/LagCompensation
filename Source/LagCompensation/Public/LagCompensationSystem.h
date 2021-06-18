@@ -28,7 +28,7 @@ namespace LagCompensationSystem
 
 #if WITH_PHYSX
 	template <>
-	LAGCOMPENSATION_API FTransform TLerp(const FTransform& A, const FTransform& B, const float Alpha);
+	LAGCOMPENSATION_API PxTransform TLerp(const PxTransform& A, const PxTransform& B, const float Alpha);
 #endif //WITH_PHYSX
 
 	template <>
