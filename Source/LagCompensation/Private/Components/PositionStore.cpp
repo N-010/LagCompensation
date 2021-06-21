@@ -406,7 +406,7 @@ bool UPositionStore::HitByPrediction(const FVector& StartPos, const FVector& Dir
 
 	UWorld* World = GetWorld();
 	FPhysScene* PhysScene = IsValid(World) ? World->GetPhysicsScene() : nullptr;
-	if(!PhysScene)
+	if (!PhysScene)
 	{
 		return false;
 	}
@@ -507,48 +507,61 @@ bool UPositionStore::ProjectileHitByPrediction(const FProjectileData& Projectile
 bool UPositionStore::Sweep(const FShapeData& A, const FShapeData& B, const FVector& UnitDirection, const float MaxDist,
                            FHitSweep& HitSweep) const
 {
-	if (!A.IsValidShapeData() || !B.IsValidShapeData() || UnitDirection.IsNearlyZero() || FMath::IsNearlyZero(MaxDist))
+	if (!IsValidBodyInstances() || !A.IsValidShapeData() || !B.IsValidShapeData() || UnitDirection.IsNearlyZero() ||
+		FMath::IsNearlyZero(MaxDist))
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	FPhysScene* PhysScene = IsValid(World) ? World->GetPhysicsScene() : nullptr;
+	if (!PhysScene)
 	{
 		return false;
 	}
 
 	const FVector NormalUnitDirection = UnitDirection.IsNormalized() ? UnitDirection : UnitDirection.GetSafeNormal();
 
-	bool bSweepResult = false;
-
 	const FPhysicsGeometry* AGeometry = nullptr;
 	const FPhysicsGeometry* BGeometry = nullptr;
 
-	for (int32 ShapeAIdx = 0; ShapeAIdx < A.ShapeAdapters.Num(); ++ShapeAIdx)
-	{
-		const FTransform& ShapeATransform = A.ShapeTransforms[ShapeAIdx];
-		AGeometry = &(A.ShapeAdapters[ShapeAIdx]->GetGeometry());
-		if (!AGeometry)
-		{
-			continue;
-		}
 
-		for (int32 ShapeBIdx = 0; ShapeBIdx < B.ShapeAdapters.Num(); ++ShapeBIdx)
+	const bool bResult = FPhysicsCommand::ExecuteRead(PhysScene, [&]()
+	{
+		bool bSweepResult = false;
+		for (int32 ShapeAIdx = 0; ShapeAIdx < A.ShapeAdapters.Num(); ++ShapeAIdx)
 		{
-			const FTransform& ShapeBTransform = B.ShapeTransforms[ShapeBIdx];
-			BGeometry = &(B.ShapeAdapters[ShapeBIdx]->GetGeometry());
-			if (!BGeometry)
+			const FTransform& ShapeATransform = A.ShapeTransforms[ShapeAIdx];
+			AGeometry = &(A.ShapeAdapters[ShapeAIdx]->GetGeometry());
+			if (!AGeometry)
 			{
 				continue;
 			}
 
-			HitSweep = FHitSweep();
-#if WITH_PHYSX
-			bSweepResult = PxGeometryQuery::sweep(U2PVector(NormalUnitDirection), MaxDist, *AGeometry,
-			                                      U2PTransform(ShapeATransform), *BGeometry,
-			                                      U2PTransform(ShapeBTransform), HitSweep);
-			if (bSweepResult)
+			for (int32 ShapeBIdx = 0; ShapeBIdx < B.ShapeAdapters.Num(); ++ShapeBIdx)
 			{
-				return true;
-			}
-#endif //WITH_PHYSX
-		}
-	}
+				const FTransform& ShapeBTransform = B.ShapeTransforms[ShapeBIdx];
+				BGeometry = &(B.ShapeAdapters[ShapeBIdx]->GetGeometry());
+				if (!BGeometry)
+				{
+					continue;
+				}
 
-	return false;
+				HitSweep = FHitSweep();
+#if WITH_PHYSX
+				bSweepResult = PxGeometryQuery::sweep(U2PVector(NormalUnitDirection), MaxDist, *AGeometry,
+				                                      U2PTransform(ShapeATransform), *BGeometry,
+				                                      U2PTransform(ShapeBTransform), HitSweep);
+				if (bSweepResult)
+				{
+					return true;
+				}
+#endif //WITH_PHYSX
+			}
+		}
+
+		return false;
+	});
+
+	return bResult;
 }
